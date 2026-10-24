@@ -699,6 +699,8 @@ main{position:relative}
             </span>
           </div>
 
+          <div class="sr-only" aria-hidden="true"><label>Сайт <input name="website" tabindex="-1" autocomplete="off"></label></div>
+
           <button class="send" id="sendBtn" type="submit">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5 10-11"/></svg>
             <span>Подтвердить</span>
@@ -727,18 +729,10 @@ main{position:relative}
 </main>
 
 <!--
-  Куда приходят ответы гостей.
-  Проще всего — Google Таблица:
-   1) Создайте таблицу, «Расширения → Apps Script», вставьте код:
-        function doPost(e) {
-          var s = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
-          var p = e.parameter;
-          if (s.getLastRow() === 0) s.appendRow(['Время','Имя','Придёт','Трансфер','Еда','Алкоголь','Ребёнок','Сообщение','Денежный подарок']);
-          s.appendRow([new Date(), p.name, p.attend, p.transfer, p.food, p.alcohol, p.child, p.message, p.gift]);
-          return ContentService.createTextOutput('ok');
-        }
-   2) «Развернуть → Новое развёртывание → Веб-приложение», доступ «Все».
-   3) Скопируйте URL вида https://script.google.com/macros/s/…/exec в CONFIG.endpoint ниже.
+  Куда приходят ответы гостей: Google Таблица со скриптом gas/Code.gs.
+   1) Таблица → «Расширения → Apps Script», вставить gas/Code.gs, запустить setup().
+   2) «Развернуть → Новое развёртывание → Веб-приложение»: от имени «Я», доступ «Все».
+   3) URL вида https://script.google.com/macros/s/…/exec вписать в CONFIG.endpoint ниже.
 -->
 <script src="assets/js/gsap.min.js"></script>
 <script src="assets/js/CustomEase.min.js"></script>
@@ -748,7 +742,7 @@ main{position:relative}
 <script>
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const CONFIG = {
-  endpoint: '',            // URL приёма ответов (Google Apps Script, Formspree и т. п.)
+  endpoint: 'https://script.google.com/macros/s/AKfycbw3U36s7aK8C69crel7eskl6gzmfGGzMZQAVw3oomD0JwtLu2JrNn-xXl-AybGtn6mo/exec', // приём анкет: Google Таблица, gas/Code.gs
   vkUrl: '',               // ссылка на группу ВКонтакте — появится кнопка под QR-кодом
   music: '',               // ссылка на mp3 — появится кнопка музыки в шапке
   start: '2027-02-27T14:30:00+05:00',
@@ -1159,6 +1153,16 @@ const setupScroll = () => {
   const giftSum = $('giftSum');
   const giftBox = $('giftAmount');
   const KEY = 'wedding-ae-2027-rsvp';
+  // ID анкеты: исправленный ответ обновляет ту же строку таблицы, а не добавляет новую
+  const guestId = (() => {
+    let id;
+    try { id = localStorage.getItem(KEY + '-id'); } catch (e) {}
+    if (!id) {
+      id = window.crypto?.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+      try { localStorage.setItem(KEY + '-id', id); } catch (e) {}
+    }
+    return id;
+  })();
   const tick = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5 10-11"/></svg>';
 
   const attendVal = () => (form.querySelector('[name=attend]:checked') || {}).value;
@@ -1252,7 +1256,8 @@ const setupScroll = () => {
     status.textContent = '';
     try {
       if (CONFIG.endpoint) {
-        await fetch(CONFIG.endpoint, {method:'POST', mode:'no-cors', body:new URLSearchParams({...data, sent:new Date().toISOString()})});
+        await fetch(CONFIG.endpoint, {method:'POST', mode:'no-cors',
+          body:new URLSearchParams({...data, id:guestId, website:form.website.value})});
       }
       try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (err) {}
       showThanks(data, true);
